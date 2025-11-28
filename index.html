@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧小費計算機</title>
+    <title>Tip小費計算機</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -88,7 +88,7 @@
         <!-- Header -->
         <div class="text-center space-y-1">
             <h1 class="text-3xl font-bold tracking-tight text-white">
-                <i class="fa-solid fa-calculator text-brand-accent mr-2"></i>智慧小費計算機
+                <i class="fa-solid fa-calculator text-brand-accent mr-2"></i>小費雞
             </h1>
             <p class="text-brand-muted text-sm">輸入稅前或稅後金額，自動計算</p>
         </div>
@@ -115,27 +115,29 @@
                 <div id="locationMsg" class="text-[10px] text-right text-brand-success mt-1 hidden"></div>
             </div>
 
-            <!-- Inputs Section -->
+            <!-- Inputs Section: Horizontal Grid Layout -->
             <div class="space-y-5">
-                
-                <!-- Pre-Tax Input -->
-                <div class="relative group">
-                    <label for="preTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅前金額 (Pre-tax)</label>
-                    <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
-                        <input type="number" id="preTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-white text-2xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-brand-accent focus:outline-none focus:ring-4 focus:ring-brand-accent/20 transition-all placeholder-slate-600">
+                <div class="grid grid-cols-2 gap-4">
+                    
+                    <!-- Pre-Tax Input -->
+                    <div class="relative group">
+                        <label for="preTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅前金額 (Pre-tax)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
+                            <input type="number" id="preTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-white text-xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-brand-accent focus:outline-none focus:ring-4 focus:ring-brand-accent/20 transition-all placeholder-slate-600">
+                        </div>
                     </div>
-                </div>
 
-                <!-- Post-Tax Input -->
-                <div class="relative group">
-                    <label for="postTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅後總額 (Post-tax)</label>
-                    <div class="relative">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
-                        <input type="number" id="postTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-brand-text text-2xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 transition-all placeholder-slate-600">
+                    <!-- Post-Tax Input -->
+                    <div class="relative group">
+                        <label for="postTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅後總額 (Post-tax)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
+                            <input type="number" id="postTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-brand-text text-xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 transition-all placeholder-slate-600">
+                        </div>
                     </div>
-                    <p class="text-[10px] text-brand-muted mt-1 text-right italic">*基於稅率自動換算</p>
                 </div>
+                <!-- Note below the inputs -->
 
                 <!-- Tip Slider -->
                 <div class="pt-2 pb-4">
@@ -143,11 +145,11 @@
                         <label class="text-sm font-semibold text-brand-text">小費比例 (Tip %)</label>
                         <span id="tipPercentDisplay" class="text-2xl font-bold text-brand-accent">15%</span>
                     </div>
-                    <input type="range" id="tipSlider" min="15" max="25" value="15" step="1" class="w-full">
+                    <input type="range" id="tipSlider" min="10" max="24" value="15" step="1" class="w-full">
                     <div class="flex justify-between text-xs text-brand-muted mt-2 px-1">
-                        <span>15%</span>
-                        <span>20%</span>
-                        <span>25%</span>
+                        <span>10%</span>
+                        <span>17%</span>
+                        <span>24%</span>
                     </div>
                 </div>
 
@@ -205,8 +207,6 @@
         let preTaxAmount = 0;
 
         // Simplified Tax Rate Database (For demo purposes)
-        // 🚨 Note: Sales tax is complex. These CA rates are common combined rates 
-        // but may vary based on specific city/district.
         const TAX_RATES_DB = {
             'TW': { rate: 5.00, name: '台灣 (營業稅)' },
             'JP': { rate: 10.00, name: '日本 (消費稅)' },
