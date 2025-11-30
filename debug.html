@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tip小費計算機 (DEBUG)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',
+                            card: '#1e293b',
+                            accent: '#38bdf8',
+                            success: '#34d399',
+                            text: '#f1f5f9',
+                            muted: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -10px; 
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Remove inner spin button for number inputs */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Loading spinner animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .fa-spinner {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-brand-dark min-h-screen flex items-center justify-center p-4 font-sans text-brand-text selection:bg-brand-accent selection:text-brand-dark">
+
+    <div class="w-full max-w-md space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center space-y-1">
+            <h1 class="text-3xl font-bold tracking-tight text-white">
+                <i class="fa-solid fa-calculator text-brand-accent mr-2"></i>小費雞 (DEBUG)
+            </h1>
+            <p class="text-brand-muted text-sm">輸入稅前或稅後金額，自動計算</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="glass-panel rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <!-- Decorative gradient blob -->
+            <div class="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 rounded-full bg-brand-accent opacity-10 blur-2xl pointer-events-none"></div>
+
+            <!-- Tax Rate Setting (Toggleable or Visible) -->
+            <div class="mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                <div class="flex items-center justify-between">
+                    <label class="text-sm text-brand-muted flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> 綜合銷售稅率 (%)
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <button id="locateBtn" class="text-brand-accent hover:text-white hover:bg-brand-accent/20 p-2 rounded-lg transition-all text-xs flex items-center gap-1" title="根據位置自動設定稅率">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                            <span class="hidden sm:inline">自動偵測</span>
+                        </button>
+                        <input type="number" id="taxRate" value="9.38" step="0.01" class="bg-transparent text-right font-bold text-brand-accent focus:outline-none w-20 border-b border-dashed border-slate-600 focus:border-brand-accent transition-colors" inputmode="decimal">
+                    </div>
+                </div>
+                <div id="locationMsg" class="text-[10px] text-right text-brand-success mt-1 hidden"></div>
+            </div>
+
+            <!-- Inputs Section: Horizontal Grid Layout -->
+            <div class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    
+                    <!-- Pre-Tax Input -->
+                    <div class="relative group">
+                        <label for="preTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅前金額 (Pre-tax)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
+                            <input type="number" id="preTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-white text-xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-brand-accent focus:outline-none focus:ring-4 focus:ring-brand-accent/20 transition-all placeholder-slate-600">
+                        </div>
+                    </div>
+
+                    <!-- Post-Tax Input -->
+                    <div class="relative group">
+                        <label for="postTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅後總額 (Post-tax)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">$</span>
+                            <input type="number" id="postTaxInput" placeholder="0.00" inputmode="decimal" class="w-full bg-slate-800 text-brand-text text-xl font-bold py-4 pl-10 pr-4 rounded-xl border-2 border-slate-700 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 transition-all placeholder-slate-600">
+                        </div>
+                    </div>
+                </div>
+                <!-- Note below the inputs -->
+
+                <!-- Tip Slider -->
+                <div class="pt-2 pb-4">
+                    <div class="flex justify-between items-end mb-4">
+                        <label class="text-sm font-semibold text-brand-text">小費比例 (Tip %)</label>
+                        <span id="tipPercentDisplay" class="text-2xl font-bold text-brand-accent">15%</span>
+                    </div>
+                    <input type="range" id="tipSlider" min="10" max="24" value="15" step="1" class="w-full">
+                    <div class="flex justify-between text-xs text-brand-muted mt-2 px-1">
+                        <span>10%</span>
+                        <span>17%</span>
+                        <span>24%</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Result Card -->
+        <div class="bg-brand-accent rounded-3xl p-6 shadow-lg shadow-brand-accent/20 text-brand-dark transform transition-all duration-300">
+            <div class="grid grid-cols-2 gap-4 divide-x divide-black/10">
+                
+                <!-- Tip Amount -->
+                <div class="text-center pr-2">
+                    <p class="text-xs font-bold uppercase tracking-wider opacity-70 mb-1">小費金額</p>
+                    <p class="text-3xl font-extrabold flex items-center justify-center gap-0.5">
+                        <span class="text-lg opacity-60">$</span>
+                        <span id="tipAmountDisplay">0.00</span>
+                    </p>
+                </div>
+
+                <!-- Total Pay -->
+                <div class="text-center pl-2">
+                    <p class="text-xs font-bold uppercase tracking-wider opacity-70 mb-1">總支付金額</p>
+                    <p class="text-4xl font-extrabold flex items-center justify-center gap-0.5">
+                        <span class="text-xl opacity-60">$</span>
+                        <span id="totalPayDisplay">0.00</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Breakdown -->
+            <div class="mt-6 pt-4 border-t border-black/10 flex justify-between text-xs font-semibold opacity-70">
+                <span>稅額 (Tax): $<span id="taxAmountDisplay">0.00</span></span>
+                <span>(小費基於稅前金額計算)</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const taxRateInput = document.getElementById('taxRate');
+        const locateBtn = document.getElementById('locateBtn');
+        const locationMsg = document.getElementById('locationMsg');
+        const preTaxInput = document.getElementById('preTaxInput');
+        const postTaxInput = document.getElementById('postTaxInput');
+        const tipSlider = document.getElementById('tipSlider');
+        const tipPercentDisplay = document.getElementById('tipPercentDisplay');
+        const tipAmountDisplay = document.getElementById('tipAmountDisplay');
+        const totalPayDisplay = document.getElementById('totalPayDisplay');
+        const taxAmountDisplay = document.getElementById('taxAmountDisplay');
+
+        // State variables
+        let taxRate = 9.38;
+        let tipPercent = 15;
+        let preTaxAmount = 0;
+
+        // Simplified Tax Rate Database (For demo purposes)
+        const TAX_RATES_DB = {
+            'TW': { rate: 5.00, name: '台灣 (營業稅)' },
+            'JP': { rate: 10.00, name: '日本 (消費稅)' },
+            'KR': { rate: 10.00, name: '韓國 (VAT)' },
+            'GB': { rate: 20.00, name: '英國 (VAT)' },
+            'AU': { rate: 10.00, name: '澳洲 (GST)' },
+            'US': {
+                'default': 6.00, // US general fallback
+                'CA_DEFAULT': 7.25, // CA State Minimum Rate
+                'CA_COUNTIES': {
+                    // Common Combined Sales Tax Rates (State + County + District/City Avg)
+                    'LOS ANGELES COUNTY': 9.50,
+                    'SAN DIEGO COUNTY': 8.25,
+                    'SAN FRANCISCO': 8.63, // SF is County/City combined
+                    'SACRAMENTO COUNTY': 8.75,
+                    'ORANGE COUNTY': 7.75,
+                    'SANTA CLARA COUNTY': 9.38, // Common rate for San Jose/Santa Clara City
+                    'ALAMEDA COUNTY': 9.75,
+                    'RIVERSIDE COUNTY': 7.75,
+                    'SAN MATEO COUNTY': 9.38,
+                    'CONTRA COSTA COUNTY': 9.25
+                    // Add more counties as needed...
+                },
+                // Fallbacks for simple state matches
+                'NY': 8.88,  // NYC approx
+                'TX': 8.25,
+                'FL': 7.00,
+                'WA': 10.25,
+                'IL': 10.25,
+            }
+        };
+
+        // Utility: Format currency
+        const formatCurrency = (num) => {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(num);
+        };
+
+        // Utility: Parse float safely
+        const parseInput = (val) => parseFloat(val) || 0;
+
+        // Feature: Auto-detect Tax Rate
+        locateBtn.addEventListener('click', () => {
+            console.log("[GEO DEBUG] 1. Locate button clicked. Checking Geolocation support.");
+
+            if (!navigator.geolocation) {
+                console.error("[GEO DEBUG] Geolocation not supported by this browser.");
+                alert('您的瀏覽器不支援地理位置功能。');
+                return;
+            }
+
+            // UI Loading State
+            const originalBtnContent = locateBtn.innerHTML;
+            locateBtn.innerHTML = '<i class="fa-solid fa-spinner"></i> 偵測中...';
+            locateBtn.disabled = true;
+            
+            // Reset message styles
+            locationMsg.classList.add('hidden');
+            locationMsg.classList.remove('text-yellow-500');
+            locationMsg.classList.add('text-brand-success');
+
+            console.log("[GEO DEBUG] 2. Attempting to get current position...");
+
+            // Geolocation options for debugging: enableHighAccuracy and timeout
+            const geoOptions = {
+                enableHighAccuracy: true,
+                timeout: 10000, // 10 seconds timeout
+                maximumAge: 0
+            };
+
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    
+                    console.log(`[GEO DEBUG] 3. Geolocation Success. Coordinates: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+
+                    // Use OpenStreetMap Nominatim API
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+                    
+                    console.log(`[GEO DEBUG] 4. Fetching location details from Nominatim: ${url}`);
+                    
+                    const response = await fetch(url);
+                    
+                    console.log(`[GEO DEBUG] 5. Nominatim Response Status: ${response.status}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Location API Error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    const address = data.address || {};
+                    const countryCode = (address.country_code || '').toUpperCase();
+                    
+                    console.log(`[GEO DEBUG] 6. Nominatim Data Received. Country: ${countryCode}, State: ${address.state || 'N/A'}, County: ${address.county || 'N/A'}`);
+                    
+                    let foundRate = null;
+                    let locationName = '';
+
+                    // Logic to determine rate
+                    if (TAX_RATES_DB[countryCode]) {
+                        if (countryCode === 'US') {
+                            const state = address.state || '';
+                            const county = address.county || '';
+                            const city = address.city || '';
+                            
+                            // 1. Check for California
+                            if (state.includes('California')) {
+                                const countyKey = (county.toUpperCase() || '')
+                                    .replace(' COUNTY', '') 
+                                    + ' COUNTY'; // Standardize the key
+
+                                console.log(`[GEO DEBUG] California detected. Checking County key: ${countyKey}`);
+
+                                if (TAX_RATES_DB.US.CA_COUNTIES[countyKey]) {
+                                    // Found a specific county rate
+                                    foundRate = TAX_RATES_DB.US.CA_COUNTIES[countyKey];
+                                    
+                                    if (city) {
+                                        locationName = `${city}, ${county} (加州)`;
+                                    } else {
+                                        locationName = `${county} (加州)`;
+                                    }
+                                    console.log(`[GEO DEBUG] CA County Match: ${locationName}, Rate: ${foundRate}`);
+
+
+                                } else {
+                                    // Fallback to CA State Minimum Rate if county not found
+                                    foundRate = TAX_RATES_DB.US.CA_DEFAULT; 
+                                    locationName = '加州 (CA 州基本稅率)';
+                                    console.log(`[GEO DEBUG] CA County NOT found. Fallback to CA Default Rate: ${foundRate}`);
+                                }
+
+                            } else {
+                                // 2. Check other simple US states
+                                if (TAX_RATES_DB.US.NY && state.includes('New York')) { foundRate = TAX_RATES_DB.US.NY; locationName = '紐約 (New York)'; }
+                                else if (TAX_RATES_DB.US.TX && state.includes('Texas')) { foundRate = TAX_RATES_DB.US.TX; locationName = '德州 (Texas)'; }
+                                else if (TAX_RATES_DB.US.FL && state.includes('Florida')) { foundRate = TAX_RATES_DB.US.FL; locationName = '佛羅里達 (Florida)'; }
+                                else if (TAX_RATES_DB.US.WA && state.includes('Washington')) { foundRate = TAX_RATES_DB.US.WA; locationName = '華盛頓州 (Washington)'; }
+                                else if (TAX_RATES_DB.US.IL && state.includes('Illinois')) { foundRate = TAX_RATES_DB.US.IL; locationName = '伊利諾州 (Illinois)'; }
+                                
+                                if (foundRate === null) {
+                                    foundRate = TAX_RATES_DB.US.default; 
+                                    locationName = '美國 (預設)';
+                                    console.log(`[GEO DEBUG] US State NOT found in DB. Fallback to US Default Rate: ${foundRate}`);
+                                } else {
+                                    console.log(`[GEO DEBUG] US State Match: ${locationName}, Rate: ${foundRate}`);
+                                }
+                            }
+                            
+                        } else {
+                            // Non-US Countries
+                            foundRate = TAX_RATES_DB[countryCode].rate;
+                            locationName = TAX_RATES_DB[countryCode].name;
+                            console.log(`[GEO DEBUG] Non-US Country Match: ${locationName}, Rate: ${foundRate}`);
+                        }
+                    } else {
+                         console.log(`[GEO DEBUG] Country Code ${countryCode} not found in DB. Fallback to default tax rate.`);
+                    }
+
+                    if (foundRate !== null) {
+                        taxRate = foundRate;
+                        taxRateInput.value = foundRate.toFixed(2);
+                        
+                        // Show success message
+                        locationMsg.textContent = `📍 已切換至 ${locationName}`;
+                        locationMsg.classList.remove('hidden');
+                        
+                        updateCalculations();
+                    } else {
+                        locationMsg.textContent = `⚠️ 未知地區 (${countryCode})，維持原設定`;
+                        locationMsg.classList.remove('hidden');
+                        locationMsg.classList.replace('text-brand-success', 'text-yellow-500');
+                    }
+
+                } catch (error) {
+                    console.error("[GEO DEBUG] 7. API Processing Error:", error.message || error);
+                    alert('無法取得詳細位置資訊，請手動輸入稅率。');
+                } finally {
+                    locateBtn.innerHTML = originalBtnContent;
+                    locateBtn.disabled = false;
+                }
+            }, (error) => {
+                // Geolocation Error Callback
+                console.error(`[GEO DEBUG] 3. Geolocation failed. Code: ${error.code}, Message: ${error.message}`);
+                let msg = '無法取得位置。';
+                if(error.code === 1) msg = '請允許瀏覽器存取位置以使用此功能。';
+                else if(error.code === 2) msg = '位置資訊來源無效。';
+                else if(error.code === 3) msg = '定位超時，請移至訊號良好處。';
+                
+                alert(msg);
+                locateBtn.innerHTML = originalBtnContent;
+                locateBtn.disabled = false;
+            }, geoOptions); // Pass geoOptions here
+        });
+
+        // Core Calculation Function
+        const updateCalculations = () => {
+            try {
+                // 1. Calculate Tax Amount
+                const taxAmount = preTaxAmount * (taxRate / 100);
+                
+                // 2. Calculate Tip Amount (Tip is based on Pre-tax)
+                const tipAmount = preTaxAmount * (tipPercent / 100);
+
+                // 3. Calculate Post-tax (Pre + Tax)
+                const postTaxAmount = preTaxAmount + taxAmount;
+
+                // 4. Calculate Total Pay (Post-tax + Tip)
+                const totalPay = postTaxAmount + tipAmount;
+
+                // UI Updates
+                if(tipPercentDisplay) tipPercentDisplay.textContent = `${tipPercent}%`;
+                if(tipAmountDisplay) tipAmountDisplay.textContent = formatCurrency(tipAmount);
+                if(totalPayDisplay) totalPayDisplay.textContent = formatCurrency(totalPay);
+                if(taxAmountDisplay) taxAmountDisplay.textContent = formatCurrency(taxAmount);
+
+                // Update Post-tax input only if it's not the currently focused element
+                if (document.activeElement !== postTaxInput && postTaxInput) {
+                    if (preTaxAmount === 0 && document.activeElement !== preTaxInput) {
+                        postTaxInput.value = '';
+                    } else {
+                        postTaxInput.value = postTaxAmount > 0 ? postTaxAmount.toFixed(2) : '';
+                    }
+                }
+            } catch (err) {
+                console.error("Calculation Error:", err);
+            }
+        };
+
+        // Event Listeners with Safety Checks
+        if(taxRateInput) {
+            taxRateInput.addEventListener('input', (e) => {
+                let val = parseInput(e.target.value);
+                if (val < 0) val = 0;
+                taxRate = val;
+                updateCalculations();
+            });
+        }
+
+        if(preTaxInput) {
+            preTaxInput.addEventListener('input', (e) => {
+                preTaxAmount = parseInput(e.target.value);
+                updateCalculations();
+            });
+        }
+
+        if(postTaxInput) {
+            postTaxInput.addEventListener('input', (e) => {
+                const postVal = parseInput(e.target.value);
+                const multiplier = 1 + (taxRate / 100);
+                preTaxAmount = postVal / multiplier;
+                if(preTaxInput) preTaxInput.value = preTaxAmount > 0 ? preTaxAmount.toFixed(2) : '';
+                updateCalculations();
+            });
+        }
+
+        if(tipSlider) {
+            tipSlider.addEventListener('input', (e) => {
+                tipPercent = parseInt(e.target.value);
+                updateCalculations();
+            });
+        }
+
+        // Initialize
+        updateCalculations();
+
+    </script>
+</body>
+</html>
