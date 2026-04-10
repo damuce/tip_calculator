@@ -10,7 +10,8 @@
          Allows "Add to Home Screen" on iPhone to work
          like a standalone app with a matching icon.
          ============================================= -->
-    <link rel="apple-touch-icon" href="icon.png">
+    <!-- href is left empty — filled at runtime by generateAppIcon() via canvas -->
+    <link id="appleTouchIcon" rel="apple-touch-icon" sizes="180x180" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="小費雞">
@@ -149,7 +150,7 @@
                             <i class="fa-solid fa-location-crosshairs"></i>
                             <span class="hidden sm:inline">自動偵測</span>
                         </button>
-                        <input type="number" id="taxRate" value="9.38" step="0.01" class="bg-transparent text-right font-bold text-brand-accent focus:outline-none w-20 border-b border-dashed border-slate-600 focus:border-brand-accent transition-colors" inputmode="decimal">
+                        <input type="number" id="taxRate" value="10.00" step="0.01" class="bg-transparent text-right font-bold text-brand-accent focus:outline-none w-20 border-b border-dashed border-slate-600 focus:border-brand-accent transition-colors" inputmode="decimal">
                     </div>
                 </div>
                 <div id="locationMsg" class="text-[10px] text-right text-brand-success mt-1 hidden"></div>
@@ -261,7 +262,7 @@
         const taxAmountDisplay = document.getElementById('taxAmountDisplay');
 
         /* ---- 2. Mutable State ---- */
-        let taxRate = 9.38;      // Combined sales tax %, synced with #taxRate input
+        let taxRate = 10.00;     // Combined sales tax %, synced with #taxRate input
         let tipPercent = 15;     // Tip %, synced with #tipSlider
         let preTaxAmount = 0;    // Source-of-truth dollar amount before tax
 
@@ -284,23 +285,33 @@
                 'CA_COUNTIES': {
                     // Common Combined Sales Tax Rates (State + County + District/City Avg)
                     'LOS ANGELES COUNTY': 9.50,
-                    'SAN DIEGO COUNTY': 8.25,
+                    'SAN DIEGO COUNTY': 7.75,
                     'SAN FRANCISCO': 8.63, // SF is County/City combined
                     'SACRAMENTO COUNTY': 8.75,
                     'ORANGE COUNTY': 7.75,
-                    'SANTA CLARA COUNTY': 9.38, // Common rate for San Jose/Santa Clara City
-                    'ALAMEDA COUNTY': 9.75,
+                    'SANTA CLARA COUNTY': 10.00, // Measure A effective Apr 1 2026 (+0.625%)
+                    'ALAMEDA COUNTY': 10.25,
                     'RIVERSIDE COUNTY': 7.75,
                     'SAN MATEO COUNTY': 9.38,
-                    'CONTRA COSTA COUNTY': 9.25
+                    'CONTRA COSTA COUNTY': 8.75
                     // Add more counties as needed...
+                },
+                'NV_DEFAULT': 6.85, // Nevada state fallback if county not found
+                'NV_COUNTIES': {
+                    // Combined rates (state 4.60% + county/local) — no city tax in NV
+                    'CLARK COUNTY':       8.375, // Las Vegas, Henderson, North Las Vegas, Boulder City
+                    'WASHOE COUNTY':      8.265, // Reno, Sparks
+                    'CARSON CITY COUNTY': 7.60,  // Carson City (independent city — Nominatim returns as county)
+                    'DOUGLAS COUNTY':     7.10,  // Lake Tahoe NV side (Stateline, Zephyr Cove, Minden)
+                    'NYE COUNTY':         7.60,  // Pahrump
                 },
                 // Fallbacks for simple state matches
                 'NY': 8.88,  // NYC approx
                 'TX': 8.25,
-                'FL': 7.00,
-                'WA': 10.25,
+                'FL': 6.00,
+                'WA': 9.47,
                 'IL': 10.25,
+                'NV': 6.85,  // Nevada fallback (actual rate depends on county — use NV_COUNTIES above)
             }
         };
 
@@ -322,7 +333,9 @@
                  reverse geocode → extract country/state/county → lookup in
                  TAX_RATES_DB → update taxRate + UI.
            Fallback chain for US:
-             CA county → CA default (7.25%) → specific state → US default (6%) */
+             CA county → CA default (7.25%) → US default (6%)
+             NV county (Clark/Washoe/Douglas/etc.) → NV default (6.85%) → US default (6%)
+             Other states → flat state rate → US default (6%) */
         locateBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
                 alert('您的瀏覽器不支援地理位置功能。');
@@ -372,34 +385,43 @@
                             // city may be absent; try town/village fallbacks
                             const city = address.city || address.town || address.village || '';
 
-                            // 1. Check for California — match full name OR state code "CA"
-                            const isCA = state.includes('California') || stateCode === 'CA';
-                            if (isCA) {
-                                // Normalize county key: "Santa Clara County" → "SANTA CLARA COUNTY"
-                                const countyKey = county.toUpperCase()
-                                    .replace(/ COUNTY$/, '')   // strip trailing " COUNTY" if present
-                                    .trim()
-                                    + ' COUNTY';
+                            // Helper: normalize county string → lookup key
+                            // e.g. "Santa Clara County" or "Santa Clara" → "SANTA CLARA COUNTY"
+                            const toCountyKey = (c) => c.toUpperCase().replace(/ COUNTY$/, '').trim() + ' COUNTY';
 
+                            // 1. California — county-level lookup
+                            const isCA = state.includes('California') || stateCode === 'CA';
+                            // 2. Nevada — county-level lookup (Las Vegas / Reno area)
+                            const isNV = state.includes('Nevada') || stateCode === 'NV';
+
+                            if (isCA) {
+                                const countyKey = toCountyKey(county);
                                 if (TAX_RATES_DB.US.CA_COUNTIES[countyKey]) {
-                                    // Found a specific county rate
                                     foundRate = TAX_RATES_DB.US.CA_COUNTIES[countyKey];
-                                    locationName = city
-                                        ? `${city}, ${county} (加州)`
-                                        : `${county} (加州)`;
+                                    locationName = city ? `${city}, ${county} (加州)` : `${county} (加州)`;
                                 } else {
-                                    // Fallback to CA State Minimum Rate if county not found
                                     foundRate = TAX_RATES_DB.US.CA_DEFAULT;
                                     locationName = '加州 (CA 州基本稅率)';
                                 }
 
+                            } else if (isNV) {
+                                const countyKey = toCountyKey(county);
+                                if (TAX_RATES_DB.US.NV_COUNTIES[countyKey]) {
+                                    foundRate = TAX_RATES_DB.US.NV_COUNTIES[countyKey];
+                                    locationName = city ? `${city}, ${county} (內華達)` : `${county} (內華達)`;
+                                } else {
+                                    foundRate = TAX_RATES_DB.US.NV_DEFAULT;
+                                    locationName = '內華達 (NV 預設)';
+                                }
+
                             } else {
-                                // 2. Check other US states — match full name OR state code
-                                if (state.includes('New York')  || stateCode === 'NY') { foundRate = TAX_RATES_DB.US.NY; locationName = '紐約 (New York)'; }
+                                // Flat state-level fallbacks
+                                if      (state.includes('New York')  || stateCode === 'NY') { foundRate = TAX_RATES_DB.US.NY; locationName = '紐約 (New York)'; }
                                 else if (state.includes('Texas')      || stateCode === 'TX') { foundRate = TAX_RATES_DB.US.TX; locationName = '德州 (Texas)'; }
                                 else if (state.includes('Florida')    || stateCode === 'FL') { foundRate = TAX_RATES_DB.US.FL; locationName = '佛羅里達 (Florida)'; }
                                 else if (state.includes('Washington') || stateCode === 'WA') { foundRate = TAX_RATES_DB.US.WA; locationName = '華盛頓州 (Washington)'; }
                                 else if (state.includes('Illinois')   || stateCode === 'IL') { foundRate = TAX_RATES_DB.US.IL; locationName = '伊利諾州 (Illinois)'; }
+                                else if (state.includes('Nevada')     || stateCode === 'NV') { foundRate = TAX_RATES_DB.US.NV; locationName = '內華達 (Nevada)'; }
 
                                 if (foundRate === null) {
                                     foundRate = TAX_RATES_DB.US.default;
@@ -526,7 +548,84 @@
             });
         }
 
-        /* ---- 8. Initialize — render zeroed-out display on page load ---- */
+        /* ---- 8. App Icon — generated via canvas, injected as data URL ----
+           Draws the same "小費雞" chicken onto an offscreen 180x180 canvas
+           and assigns the result to the apple-touch-icon <link> element.
+           No external icon.png file required. */
+        function generateAppIcon() {
+            try {
+                const c = document.createElement('canvas');
+                c.width = 180; c.height = 180;
+                const ctx = c.getContext('2d');
+
+                // Background: sky-blue rounded square (brand-accent #38bdf8)
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath(); ctx.roundRect(0, 0, 180, 180, 38); ctx.fill();
+
+                const cream  = '#FFF8DC';
+                const wing   = '#EEE4C3';
+                const dark   = '#232323';
+                const white  = '#FFFFFF';
+                const orange = '#FFA014';
+                const red    = '#D22D2D';
+                const blush  = 'rgba(255,160,130,0.45)';
+
+                // Wings (behind body — drawn first)
+                ctx.fillStyle = wing;
+                ctx.beginPath(); ctx.ellipse(52,  118, 28, 22, -0.3, 0, Math.PI * 2); ctx.fill(); // left
+                ctx.beginPath(); ctx.ellipse(128, 118, 28, 22,  0.3, 0, Math.PI * 2); ctx.fill(); // right
+
+                // Body
+                ctx.fillStyle = cream;
+                ctx.beginPath(); ctx.ellipse(90, 122, 48, 38, 0, 0, Math.PI * 2); ctx.fill();
+
+                // Head
+                ctx.fillStyle = cream;
+                ctx.beginPath(); ctx.ellipse(90, 72, 32, 30, 0, 0, Math.PI * 2); ctx.fill();
+
+                // Comb (3 red bumps)
+                ctx.fillStyle = red;
+                ctx.beginPath(); ctx.ellipse(80,  46, 9, 13, -0.2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(91,  40, 9, 14,    0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(102, 46, 9, 13,  0.2, 0, Math.PI * 2); ctx.fill();
+
+                // Eyes
+                ctx.fillStyle = dark;
+                ctx.beginPath(); ctx.ellipse(76, 68, 7, 7, 0, 0, Math.PI * 2); ctx.fill(); // left
+                ctx.beginPath(); ctx.ellipse(104,68, 7, 7, 0, 0, Math.PI * 2); ctx.fill(); // right
+                // Highlights
+                ctx.fillStyle = white;
+                ctx.beginPath(); ctx.ellipse(78, 65, 3, 3, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(106,65, 3, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+                // Blush cheeks
+                ctx.fillStyle = blush;
+                ctx.beginPath(); ctx.ellipse(68, 78, 9, 6, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(112,78, 9, 6, 0, 0, Math.PI * 2); ctx.fill();
+
+                // Beak (orange triangle)
+                ctx.fillStyle = orange;
+                ctx.beginPath();
+                ctx.moveTo(83, 78); ctx.lineTo(97, 78); ctx.lineTo(90, 91);
+                ctx.closePath(); ctx.fill();
+
+                // Feet & toes
+                ctx.fillStyle = orange;
+                ctx.fillRect(78, 154, 9, 16);   // left leg
+                ctx.fillRect(93, 154, 9, 16);   // right leg
+                // Left toes
+                ctx.beginPath(); ctx.ellipse(69,  168, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(82,  168, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                // Right toes
+                ctx.beginPath(); ctx.ellipse(95,  168, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.ellipse(108, 168, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+                document.getElementById('appleTouchIcon').href = c.toDataURL('image/png');
+            } catch(e) { /* silently skip if canvas unavailable */ }
+        }
+
+        /* ---- 9. Initialize ---- */
+        generateAppIcon();
         updateCalculations();
 
     </script>
