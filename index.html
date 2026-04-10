@@ -4,13 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tip小費計算機</title>
-    <!-- Tailwind CSS -->
+
+    <!-- =============================================
+         PWA / HOME SCREEN (iOS)
+         Allows "Add to Home Screen" on iPhone to work
+         like a standalone app with a matching icon.
+         ============================================= -->
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="小費雞">
+    <meta name="theme-color" content="#38bdf8">
+
+    <!-- =============================================
+         EXTERNAL DEPENDENCIES
+         All loaded via CDN — no build step required.
+         ============================================= -->
+    <!-- Tailwind CSS (runtime JIT compiler) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
+    <!-- Google Fonts — Inter (400/600/700) for clean UI typography -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
+    <!-- Font Awesome 6 — icons for calculator, location, invoice, spinner -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
+    <!-- =============================================
+         TAILWIND CONFIG
+         Extends the default theme with custom brand
+         colors used throughout the UI.
+         ============================================= -->
     <script>
         tailwind.config = {
             theme: {
@@ -20,20 +41,29 @@
                     },
                     colors: {
                         brand: {
-                            dark: '#0f172a',
-                            card: '#1e293b',
-                            accent: '#38bdf8',
-                            success: '#34d399',
-                            text: '#f1f5f9',
-                            muted: '#94a3b8'
+                            dark: '#0f172a',    // Page background (slate-900)
+                            card: '#1e293b',    // Card background (slate-800) — used in .glass-panel
+                            accent: '#38bdf8',  // Primary accent (sky-400) — buttons, highlights, result card
+                            success: '#34d399', // Success text (emerald-400) — geolocation confirmation
+                            text: '#f1f5f9',    // Primary text (slate-100)
+                            muted: '#94a3b8'    // Secondary/label text (slate-400)
                         }
                     }
                 }
             }
         }
     </script>
+
+    <!-- =============================================
+         CUSTOM STYLES
+         - Range slider: overrides browser defaults for
+           a consistent look (sky-blue thumb, slate track)
+         - Number input: hides the native spin buttons
+         - Glass panel: frosted-glass card effect
+         - Spinner: rotation keyframe for loading state
+         ============================================= -->
     <style>
-        /* Custom Range Slider Styling */
+        /* Custom Range Slider — override native browser chrome */
         input[type=range] {
             -webkit-appearance: none; 
             background: transparent; 
@@ -65,14 +95,15 @@
             margin: 0; 
         }
         
+        /* Glassmorphism card — semi-transparent with backdrop blur */
         .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
+            background: rgba(30, 41, 59, 0.7);       /* brand-card at 70% opacity */
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);      /* Safari support */
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Loading spinner animation */
+        /* Loading spinner animation — used during geolocation fetch */
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -81,11 +112,18 @@
         }
     </style>
 </head>
+<!-- =============================================
+     PAGE LAYOUT
+     Single centered column (max-w-md), three sections:
+       1. Header — app title + subtitle
+       2. Main Card — tax rate, pre/post-tax inputs, tip slider
+       3. Result Card — tip amount, total pay, tax breakdown
+     ============================================= -->
 <body class="bg-brand-dark min-h-screen flex items-center justify-center p-4 font-sans text-brand-text selection:bg-brand-accent selection:text-brand-dark">
 
     <div class="w-full max-w-md space-y-6">
-        
-        <!-- Header -->
+
+        <!-- ===== SECTION 1: Header ===== -->
         <div class="text-center space-y-1">
             <h1 class="text-3xl font-bold tracking-tight text-white">
                 <i class="fa-solid fa-calculator text-brand-accent mr-2"></i>小費雞
@@ -93,12 +131,14 @@
             <p class="text-brand-muted text-sm">輸入稅前或稅後金額，自動計算</p>
         </div>
 
-        <!-- Main Card -->
+        <!-- ===== SECTION 2: Main Input Card (glass-panel) ===== -->
         <div class="glass-panel rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <!-- Decorative gradient blob -->
+            <!-- Decorative gradient blob — purely cosmetic accent glow -->
             <div class="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 rounded-full bg-brand-accent opacity-10 blur-2xl pointer-events-none"></div>
 
-            <!-- Tax Rate Setting (Toggleable or Visible) -->
+            <!-- Tax Rate — editable number input + geolocation auto-detect button.
+                 Default: 9.38% (Santa Clara County, CA).
+                 The "自動偵測" button triggers reverse-geocoding to set the rate. -->
             <div class="mb-6 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <div class="flex items-center justify-between">
                     <label class="text-sm text-brand-muted flex items-center gap-2">
@@ -115,11 +155,12 @@
                 <div id="locationMsg" class="text-[10px] text-right text-brand-success mt-1 hidden"></div>
             </div>
 
-            <!-- Inputs Section: Horizontal Grid Layout -->
+            <!-- Amount Inputs — side-by-side pre-tax and post-tax fields.
+                 Editing one auto-calculates the other via updateCalculations(). -->
             <div class="space-y-5">
                 <div class="grid grid-cols-2 gap-4">
-                    
-                    <!-- Pre-Tax Input -->
+
+                    <!-- Pre-Tax Input — the primary input; tip is calculated from this value -->
                     <div class="relative group">
                         <label for="preTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅前金額 (Pre-tax)</label>
                         <div class="relative">
@@ -128,7 +169,7 @@
                         </div>
                     </div>
 
-                    <!-- Post-Tax Input -->
+                    <!-- Post-Tax Input — back-calculates pre-tax as: postTax / (1 + taxRate) -->
                     <div class="relative group">
                         <label for="postTaxInput" class="block text-xs font-semibold uppercase tracking-wider text-brand-muted mb-1 ml-1">稅後總額 (Post-tax)</label>
                         <div class="relative">
@@ -137,9 +178,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- Note below the inputs -->
-
-                <!-- Tip Slider -->
+                <!-- Tip Slider — range 10%-24%, step 1%, default 15% -->
                 <div class="pt-2 pb-4">
                     <div class="flex justify-between items-end mb-4">
                         <label class="text-sm font-semibold text-brand-text">小費比例 (Tip %)</label>
@@ -156,7 +195,9 @@
             </div>
         </div>
 
-        <!-- Result Card -->
+        <!-- ===== SECTION 3: Result Card =====
+             Displays: tip amount | total pay (pre-tax + tax + tip)
+             Footer shows tax amount and a note that tip is based on pre-tax. -->
         <div class="bg-brand-accent rounded-3xl p-6 shadow-lg shadow-brand-accent/20 text-brand-dark transform transition-all duration-300">
             <div class="grid grid-cols-2 gap-4 divide-x divide-black/10">
                 
@@ -188,8 +229,26 @@
 
     </div>
 
+    <!-- =============================================
+         JAVASCRIPT
+         Architecture:
+           1. DOM refs — cached element references
+           2. State — taxRate, tipPercent, preTaxAmount
+           3. TAX_RATES_DB — hardcoded lookup table for geolocation
+           4. Utilities — formatCurrency(), parseInput()
+           5. Geolocation handler — reverse-geocode → lookup tax rate
+           6. updateCalculations() — core math, updates all display elements
+           7. Event listeners — input handlers for tax rate, amounts, slider
+           8. Init — calls updateCalculations() once on page load
+
+         Key formula:
+           tip     = preTax × (tipPercent / 100)   ← tip on pre-tax only
+           tax     = preTax × (taxRate / 100)
+           postTax = preTax + tax
+           total   = postTax + tip
+         ============================================= -->
     <script>
-        // DOM Elements
+        /* ---- 1. DOM Element References ---- */
         const taxRateInput = document.getElementById('taxRate');
         const locateBtn = document.getElementById('locateBtn');
         const locationMsg = document.getElementById('locationMsg');
@@ -201,12 +260,18 @@
         const totalPayDisplay = document.getElementById('totalPayDisplay');
         const taxAmountDisplay = document.getElementById('taxAmountDisplay');
 
-        // State variables
-        let taxRate = 9.38;
-        let tipPercent = 15;
-        let preTaxAmount = 0;
+        /* ---- 2. Mutable State ---- */
+        let taxRate = 9.38;      // Combined sales tax %, synced with #taxRate input
+        let tipPercent = 15;     // Tip %, synced with #tipSlider
+        let preTaxAmount = 0;    // Source-of-truth dollar amount before tax
 
-        // Simplified Tax Rate Database (For demo purposes)
+        /* ---- 3. Tax Rate Lookup Table ----
+           Used by geolocation to auto-set taxRate.
+           Structure:
+             - Non-US countries: { rate, name }
+             - US: nested by state, with California broken out by county.
+           NOTE: These are approximate combined rates (state + county + district).
+                 They may drift over time — not a live API. */
         const TAX_RATES_DB = {
             'TW': { rate: 5.00, name: '台灣 (營業稅)' },
             'JP': { rate: 10.00, name: '日本 (消費稅)' },
@@ -239,7 +304,9 @@
             }
         };
 
-        // Utility: Format currency
+        /* ---- 4. Utility Functions ---- */
+
+        // Format a number as "1,234.56" (US locale, always 2 decimal places)
         const formatCurrency = (num) => {
             return new Intl.NumberFormat('en-US', {
                 minimumFractionDigits: 2,
@@ -247,10 +314,15 @@
             }).format(num);
         };
 
-        // Utility: Parse float safely
+        // Safely parse a string to float; returns 0 on NaN/empty
         const parseInput = (val) => parseFloat(val) || 0;
 
-        // Feature: Auto-detect Tax Rate
+        /* ---- 5. Geolocation Auto-Detect ----
+           Flow: browser geolocation → lat/lng → OpenStreetMap Nominatim
+                 reverse geocode → extract country/state/county → lookup in
+                 TAX_RATES_DB → update taxRate + UI.
+           Fallback chain for US:
+             CA county → CA default (7.25%) → specific state → US default (6%) */
         locateBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
                 alert('您的瀏覽器不支援地理位置功能。');
@@ -282,7 +354,10 @@
                     const data = await response.json();
                     const address = data.address || {};
                     const countryCode = (address.country_code || '').toUpperCase();
-                    
+
+                    // Debug: log raw address fields (useful for diagnosing mobile issues)
+                    console.log('[TipCalc] Nominatim address:', JSON.stringify(address));
+
                     let foundRate = null;
                     let locationName = '';
 
@@ -290,41 +365,44 @@
                     if (TAX_RATES_DB[countryCode]) {
                         if (countryCode === 'US') {
                             const state = address.state || '';
-                            const county = address.county || '';
-                            const city = address.city || '';
-                            
-                            // 1. Check for California
-                            if (state.includes('California')) {
-                                const countyKey = (county.toUpperCase() || '')
-                                    .replace(' COUNTY', '') 
-                                    + ' COUNTY'; // Standardize the key
+                            // ISO3166-2-lvl4 gives "US-CA", "US-NY", etc. — more reliable on mobile
+                            const stateCode = (address['ISO3166-2-lvl4'] || '').replace('US-', '');
+                            // county may be absent on mobile; fall back to suburb or empty string
+                            const county = address.county || address.suburb || '';
+                            // city may be absent; try town/village fallbacks
+                            const city = address.city || address.town || address.village || '';
+
+                            // 1. Check for California — match full name OR state code "CA"
+                            const isCA = state.includes('California') || stateCode === 'CA';
+                            if (isCA) {
+                                // Normalize county key: "Santa Clara County" → "SANTA CLARA COUNTY"
+                                const countyKey = county.toUpperCase()
+                                    .replace(/ COUNTY$/, '')   // strip trailing " COUNTY" if present
+                                    .trim()
+                                    + ' COUNTY';
 
                                 if (TAX_RATES_DB.US.CA_COUNTIES[countyKey]) {
                                     // Found a specific county rate
                                     foundRate = TAX_RATES_DB.US.CA_COUNTIES[countyKey];
-                                    
-                                    if (city) {
-                                        locationName = `${city}, ${county} (加州)`;
-                                    } else {
-                                        locationName = `${county} (加州)`;
-                                    }
-
+                                    locationName = city
+                                        ? `${city}, ${county} (加州)`
+                                        : `${county} (加州)`;
                                 } else {
                                     // Fallback to CA State Minimum Rate if county not found
-                                    foundRate = TAX_RATES_DB.US.CA_DEFAULT; 
+                                    foundRate = TAX_RATES_DB.US.CA_DEFAULT;
                                     locationName = '加州 (CA 州基本稅率)';
                                 }
 
                             } else {
-                                // 2. Check other simple US states
-                                if (TAX_RATES_DB.US.NY && state.includes('New York')) { foundRate = TAX_RATES_DB.US.NY; locationName = '紐約 (New York)'; }
-                                else if (TAX_RATES_DB.US.TX && state.includes('Texas')) { foundRate = TAX_RATES_DB.US.TX; locationName = '德州 (Texas)'; }
-                                else if (TAX_RATES_DB.US.FL && state.includes('Florida')) { foundRate = TAX_RATES_DB.US.FL; locationName = '佛羅里達 (Florida)'; }
-                                else if (TAX_RATES_DB.US.WA && state.includes('Washington')) { foundRate = TAX_RATES_DB.US.WA; locationName = '華盛頓州 (Washington)'; }
-                                else if (TAX_RATES_DB.US.IL && state.includes('Illinois')) { foundRate = TAX_RATES_DB.US.IL; locationName = '伊利諾州 (Illinois)'; }
-                                
+                                // 2. Check other US states — match full name OR state code
+                                if (state.includes('New York')  || stateCode === 'NY') { foundRate = TAX_RATES_DB.US.NY; locationName = '紐約 (New York)'; }
+                                else if (state.includes('Texas')      || stateCode === 'TX') { foundRate = TAX_RATES_DB.US.TX; locationName = '德州 (Texas)'; }
+                                else if (state.includes('Florida')    || stateCode === 'FL') { foundRate = TAX_RATES_DB.US.FL; locationName = '佛羅里達 (Florida)'; }
+                                else if (state.includes('Washington') || stateCode === 'WA') { foundRate = TAX_RATES_DB.US.WA; locationName = '華盛頓州 (Washington)'; }
+                                else if (state.includes('Illinois')   || stateCode === 'IL') { foundRate = TAX_RATES_DB.US.IL; locationName = '伊利諾州 (Illinois)'; }
+
                                 if (foundRate === null) {
-                                    foundRate = TAX_RATES_DB.US.default; 
+                                    foundRate = TAX_RATES_DB.US.default;
                                     locationName = '美國 (預設)';
                                 }
                             }
@@ -369,7 +447,11 @@
             });
         });
 
-        // Core Calculation Function
+        /* ---- 6. Core Calculation Engine ----
+           Called on every input change (tax rate, pre-tax, post-tax, tip slider).
+           Reads from state vars (preTaxAmount, taxRate, tipPercent),
+           computes derived values, and writes to all display elements.
+           Post-tax input is also updated UNLESS the user is currently typing in it. */
         const updateCalculations = () => {
             try {
                 // 1. Calculate Tax Amount
@@ -403,7 +485,11 @@
             }
         };
 
-        // Event Listeners with Safety Checks
+        /* ---- 7. Event Listeners ----
+           Each listener is guarded with an existence check (defensive, in case
+           DOM structure changes). All funnel into updateCalculations(). */
+
+        // Tax rate manual edit — clamp to >= 0
         if(taxRateInput) {
             taxRateInput.addEventListener('input', (e) => {
                 let val = parseInput(e.target.value);
@@ -413,6 +499,7 @@
             });
         }
 
+        // Pre-tax input — directly sets the source-of-truth preTaxAmount
         if(preTaxInput) {
             preTaxInput.addEventListener('input', (e) => {
                 preTaxAmount = parseInput(e.target.value);
@@ -420,6 +507,7 @@
             });
         }
 
+        // Post-tax input — reverse-calculates pre-tax: preTax = postTax / (1 + rate)
         if(postTaxInput) {
             postTaxInput.addEventListener('input', (e) => {
                 const postVal = parseInput(e.target.value);
@@ -430,6 +518,7 @@
             });
         }
 
+        // Tip slider — updates tipPercent (integer 10-24)
         if(tipSlider) {
             tipSlider.addEventListener('input', (e) => {
                 tipPercent = parseInt(e.target.value);
@@ -437,7 +526,7 @@
             });
         }
 
-        // Initialize
+        /* ---- 8. Initialize — render zeroed-out display on page load ---- */
         updateCalculations();
 
     </script>
